@@ -185,6 +185,9 @@ if __name__ == "__main__":
     main()
 ```
 
+### Requirements File
+**Important**: Include a `requirements.txt` file in your code directory listing all Python packages your job needs. This file will be automatically installed within the job environment.
+
 ### Automatic Dependencies
 The SDK automatically adds these packages to your requirements.txt:
 - `nbconvert` - For Jupyter notebook execution
@@ -263,16 +266,16 @@ result = client.submit_job(
 )
 ```
 
-### Multi-Instance Model Training
+### Multi-Instance Data Processing
 
 ```python
-# Submit job with 4 instances for parallel training
+# Submit job with 4 instances for parallel processing with SM_HOSTS and your custom parallelization logic
 result = client.submit_job(
-    directory="./distributed_training",  # Contains training code and data
-    job_name="multi-instance-training",
-    instance_type="ml.g4dn.2xlarge",
-    instance_count=4,  # 4 instances for parallel training
-    entrypoint="distributed_train.py",  # Your parallel training script
+    directory="./image_classification_model",  # Contains processing code and data
+    job_name="multi-instance-image-processing",
+    instance_type="ml.m5.2xlarge",
+    instance_count=4,  # 4 instances for parallel processing
+    entrypoint="process_images.py",  # Your parallel processing script using SM_HOSTS
     volume_size_gb=50
 )
 ```

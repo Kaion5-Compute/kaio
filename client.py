@@ -170,6 +170,10 @@ class Client:
             ...     entrypoint="parallel_process.py"
             ... )
         """
+        # Validate volume size
+        if volume_size_gb > 50:
+            raise ValueError(f"Volume size {volume_size_gb}GB exceeds maximum allowed size of 50GB")
+        
         # Resolve image URI using advanced resolution logic
         image_uri = resolve_image(instance_type, framework, framework_version)
         if self.verbose:
