@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="kaio",
-    version="0.1.0",
+    version="0.1.1",
     author="Kaio Platform",
     author_email="danielb@kaion5.com",
     description="Python client for the Kaio multi-tenant machine learning platform",
