@@ -109,14 +109,14 @@ class Client:
 
         Packages your code directory, uploads it to S3, and triggers SageMaker Processing job execution.
         Automatically detects your local ML framework and selects appropriate Docker images.
-        
+
         This implementation uses SageMaker Processing Jobs, which are designed for data processing,
-        feature engineering, model evaluation, and model training tasks. Multi-instance processing 
+        feature engineering, model evaluation, and model training tasks. Multi-instance processing
         enables parallel processing of large datasets across multiple instances.
-        
+
         Note: Processing jobs can be used for model training by simply providing your training
         code as the entrypoint. All data needed for the job must be included in the directory.
-        
+
         Security: Jobs run in Kaion5 Compute's AWS account. Do not upload sensitive data.
         All data and outputs are deleted after 7 days. Job telemetry data (job names,
         instance types, status, runtime, compute metrics, storage configs) is retained
@@ -130,7 +130,7 @@ class Client:
             instance_count (int): Number of instances for parallel processing. Defaults to 1.
                 When instance_count > 1:
                 - SageMaker launches multiple instances to process data in parallel
-                - Each instance receives SM_CURRENT_HOST (e.g., "algo-1", "algo-2") and 
+                - Each instance receives SM_CURRENT_HOST (e.g., "algo-1", "algo-2") and
                   SM_HOSTS (comma-separated list: "algo-1,algo-2,algo-3") environment variables
                 - No networking is configured between instances - they run independently
                 - Use SM_CURRENT_HOST and SM_HOSTS to implement custom data partitioning logic
@@ -160,7 +160,7 @@ class Client:
             ...     instance_type="ml.m5.xlarge",
             ...     entrypoint="preprocess.py"
             ... )
-            
+
             Multi-instance parallel processing:
             >>> result = client.submit_job(
             ...     directory="./parallel_processing",
@@ -172,8 +172,10 @@ class Client:
         """
         # Validate volume size
         if volume_size_gb > 50:
-            raise ValueError(f"Volume size {volume_size_gb}GB exceeds maximum allowed size of 50GB")
-        
+            raise ValueError(
+                f"Volume size {volume_size_gb}GB exceeds maximum allowed size of 50GB"
+            )
+
         # Resolve image URI using advanced resolution logic
         image_uri = resolve_image(instance_type, framework, framework_version)
         if self.verbose:
@@ -240,52 +242,95 @@ class Client:
             except OSError:
                 pass
 
-        # 3. Return upload success
+        # 3. Return upload success with unique job name
         return {
             "status": "uploaded",
             "job_name": job_name,
+            "unique_job_name": presign.get("unique_job_name"),
             "entrypoint": entrypoint,
         }
 
-    def get_job(self, job_id):
-        """Get job status and details.
-
-        Args:
-            job_id (str): Job identifier
+    def get_jobs(self):
+        """Get all jobs for the authenticated user.
 
         Returns:
-            dict: Job details including status, logs, and output URLs
+            dict: List of jobs with count
+
+        Raises:
+            requests.HTTPError: If API error
+        """
+        resp = requests.get(f"{self.api_base}/jobs", headers=self._auth_headers())
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_job(self, unique_job_name):
+        """Get specific job status and details.
+
+        Args:
+            unique_job_name (str): Unique job name returned from submit_job
+
+        Returns:
+            dict: Job details including status and timestamp
 
         Raises:
             requests.HTTPError: If job not found or API error
         """
         resp = requests.get(
-            f"{self.api_base}/jobs/{job_id}", headers=self._auth_headers()
+            f"{self.api_base}/jobs/status/{unique_job_name}",
+            headers=self._auth_headers(),
         )
         resp.raise_for_status()
         return resp.json()
 
-    def download_output(self, job_id, output_dir="."):
+    def download_output(self, unique_job_name, output_dir="."):
         """Download completed job output files.
 
         Args:
-            job_id (str): Job identifier
+            unique_job_name (str): Unique job name returned from submit_job
             output_dir (str): Local directory to save output. Defaults to current directory.
 
         Returns:
-            Path: Path to downloaded output tar.gz file
+            list: List of downloaded file paths
 
         Raises:
             RuntimeError: If job is not completed
             requests.HTTPError: If download fails
         """
-        job = self.get_job(job_id)
-        if job["status"] != "Completed":
-            raise RuntimeError(f"Job not completed yet: {job['status']}")
-        output_url = job["output_url"]
-        resp = requests.get(output_url)
+        # Get job output files with presigned URLs
+        resp = requests.get(
+            f"{self.api_base}/jobs/download/{unique_job_name}",
+            headers=self._auth_headers(),
+        )
         resp.raise_for_status()
-        out_path = Path(output_dir) / f"{job_id}_output.tar.gz"
-        with open(out_path, "wb") as f:
-            f.write(resp.content)
-        return out_path
+
+        data = resp.json()
+        output_files = data.get("output_files", [])
+
+        if not output_files:
+            if self.verbose:
+                print("No output files found for this job")
+            return []
+
+        downloaded_files = []
+        output_path = Path(output_dir)
+        output_path.mkdir(exist_ok=True)
+
+        for filename, last_modified, presigned_url in output_files:
+            if self.verbose:
+                print(f"Downloading {filename}...")
+
+            file_resp = requests.get(presigned_url)
+            file_resp.raise_for_status()
+
+            file_path = output_path / filename
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(file_path, "wb") as f:
+                f.write(file_resp.content)
+
+            downloaded_files.append(file_path)
+
+            if self.verbose:
+                print(f"✓ Downloaded {filename} to {file_path}")
+
+        return downloaded_files
