@@ -99,33 +99,62 @@ Submit a SageMaker Processing job with automatic image resolution.
 - `FileNotFoundError`: If directory or entrypoint doesn't exist
 - `ValueError`: If code package exceeds volume capacity
 
-#### `get_job(job_id)`
+#### `get_jobs()`
 
-Get job status and details.
-
-**Parameters:**
-- `job_id` (str): Job identifier
+Get all jobs for the authenticated user.
 
 **Returns:**
-- `dict`: Job details including status, logs, and output URLs
+- `dict`: List of jobs with count
+
+**Raises:**
+- `requests.HTTPError`: If API error
+
+**Example:**
+```python
+jobs = client.get_jobs()
+print(f"Total jobs: {jobs['count']}")
+```
+
+#### `get_job(unique_job_name)`
+
+Get specific job status and details.
+
+**Parameters:**
+- `unique_job_name` (str): Unique job name returned from submit_job
+
+**Returns:**
+- `dict`: Job details including status and timestamp
 
 **Raises:**
 - `requests.HTTPError`: If job not found or API error
 
-#### `download_output(job_id, output_dir=".")`
+**Example:**
+```python
+job = client.get_job("unique-job-name-123")
+print(f"Status: {job['status']}")
+```
+
+#### `download_output(unique_job_name, output_dir=".")`
 
 Download completed job output files.
 
 **Parameters:**
-- `job_id` (str): Job identifier
+- `unique_job_name` (str): Unique job name returned from submit_job
 - `output_dir` (str): Local directory to save output. Defaults to current directory.
 
 **Returns:**
-- `Path`: Path to downloaded output tar.gz file
+- `list`: List of downloaded file paths
 
 **Raises:**
 - `RuntimeError`: If job is not completed
 - `requests.HTTPError`: If download fails
+
+**Example:**
+```python
+files = client.download_output("unique-job-name-123", "./results")
+for file_path in files:
+    print(f"Downloaded: {file_path}")
+```
 
 ## Supported Instance Types
 
@@ -302,6 +331,69 @@ result = client.submit_job(
     instance_type="ml.m5.xlarge",
     entrypoint="analysis.ipynb"
 )
+```
+
+## Job Management
+
+### Getting All Jobs
+
+```python
+# Get list of all your jobs
+jobs = client.get_jobs()
+print(f"Total jobs: {jobs['count']}")
+for job in jobs['jobs']:
+    print(f"Job: {job['job_name']} - Status: {job['status']}")
+```
+
+### Getting Job Status
+
+```python
+# Get specific job details (use unique_job_name from submit_job response)
+job_details = client.get_job("unique-job-name-123")
+print(f"Status: {job_details['status']}")
+print(f"Started: {job_details['start_time']}")
+if job_details['status'] == 'Completed':
+    print(f"Completed: {job_details['end_time']}")
+```
+
+### Downloading Job Outputs
+
+```python
+# Download all output files from a completed job
+downloaded_files = client.download_output("unique-job-name-123", "./results")
+for file_path in downloaded_files:
+    print(f"Downloaded: {file_path}")
+```
+
+### Complete Job Workflow
+
+```python
+# Submit job
+result = client.submit_job(
+    directory="./my_training",
+    job_name="model-training",
+    instance_type="ml.g4dn.xlarge"
+)
+
+unique_job_name = result['unique_job_name']
+print(f"Job submitted: {unique_job_name}")
+
+# Monitor job status
+import time
+while True:
+    job = client.get_job(unique_job_name)
+    status = job['status']
+    print(f"Job status: {status}")
+    
+    if status in ['Completed', 'Failed', 'Stopped']:
+        break
+    
+    time.sleep(30)  # Check every 30 seconds
+
+# Download results if completed
+if status == 'Completed':
+    files = client.download_output(unique_job_name, "./results")
+    print(f"Downloaded {len(files)} files")
 ```
 
 ## Error Handling
