@@ -337,25 +337,39 @@ ALL_URIS = [
 
 def resolve_image(instance_type, framework=None, version=None):
     """Resolve SageMaker image URI using smart resolution logic"""
-
-    # If specific framework and version provided, use them
-    if framework and version:
-        env_info = get_env_info()
-        reqs = {
-            "python_version": env_info["python_version"],
-            f"{framework}_version": version,
-        }
+    
+    env_info = get_env_info()
+    
+    # If framework is specified, prioritize it
+    if framework:
+        # Create requirements dict with specified framework
+        reqs = {"python_version": env_info["python_version"]}
+        
+        if version:
+            # Use specified version
+            reqs[f"{framework}_version"] = version
+        else:
+            # Use detected version or latest available
+            detected_version = env_info.get(f"{framework}_version")
+            if detected_version:
+                reqs[f"{framework}_version"] = detected_version
+            else:
+                # Find latest available version for this framework
+                parsed = [p for u in ALL_URIS if (p := parse_uri(u)) and p["framework"] == framework]
+                if parsed:
+                    latest = max(parsed, key=lambda p: version.parse(p["version"]))
+                    reqs[f"{framework}_version"] = latest["version"]
+        
         result = smart_resolve(ALL_URIS, reqs, instance_type)
         if result["final_selection"]:
             return result["final_selection"]["uri"]
-
+    
     # Auto-detect from environment
-    env_info = get_env_info()
     result = smart_resolve(ALL_URIS, env_info, instance_type)
-
+    
     if result["final_selection"]:
         return result["final_selection"]["uri"]
-
+    
     # Fallback to defaults
     is_gpu = is_gpu_instance(instance_type)
     if is_gpu:

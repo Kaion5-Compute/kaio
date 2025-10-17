@@ -180,7 +180,7 @@ The SDK automatically detects your local ML framework and selects appropriate Do
 ### Data and Code Structure
 **Important**: All data needed for your job must be included in the directory you submit with `client.submit_job()`. The entire directory is packaged and uploaded to SageMaker.
 
-**Security Notice**: Jobs run securely in Kaion5 Compute's AWS account. Do not upload sensitive or confidential data. All uploaded data and job outputs are automatically deleted after 7 days. There will be future development and Kaio abilities for even more secure Bring-Your-Own-Account workflows, where you'd have access to a the Kaio dashbaord for jobs submitted though Kaio in your own account. 
+**Security Notice**: Jobs run securely in Kaion5 Compute's AWS account. Do not upload sensitive or confidential data. All uploaded data and job outputs are automatically deleted after 7 days. There will be future development and Kaio abilities for even more secure Bring-Your-Own-Account workflows, where you'd have access to the Kaio dashbaord for jobs submitted though Kaio in your own account. 
 
 **Telemetry Data**: By using this client, you acknowledge and agree that Kaion5 Compute will retain job telemetry data (job names, instance types, job status, runtime, compute metrics, storage configurations) even after job cleanup. This data helps optimize the platform and provision future instances based on usage patterns. After 7 days, logs, code, and data are permanently deleted and not stored.
 
